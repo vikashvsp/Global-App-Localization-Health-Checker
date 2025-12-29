@@ -244,8 +244,8 @@ async def main():
             </html>
             """
             
-            await Actor.set_value('OUTPUT.html', html_report, content_type='text/html')
-            Actor.log.info("HTML Report generated: OUTPUT.html")
+            await Actor.set_value('OUTPUT', html_report, content_type='text/html')
+            Actor.log.info("HTML Report generated: OUTPUT")
 
             df = pd.DataFrame(csv_data)
             await Actor.set_value('localization_issues.csv', df.to_csv(index=False), content_type='text/csv')
