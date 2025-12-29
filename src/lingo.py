@@ -16,7 +16,7 @@ class LingoClient:
             return f"[MOCK TRANSLATION to {target_lang}] {text}"
             
         try:
-            async with LingoDotDevEngine({"api_key": self.api_key}) as lingo:
+            async with LingoDotDevEngine(api_key=self.api_key) as lingo:
                 # Assuming simple translate_text or similar method exists in SDK
                 # Adjusted to likely method name or standard usage. 
                 # If 'translate_text' doesn't exist, we might fail again.
