@@ -45,67 +45,56 @@ async def main():
         total_mixed = 0
         total_broken = 0
 
-        for page in crawled_data:
+        for i, page in enumerate(crawled_data):
+            Actor.log.info(f"Analyzing page {i+1}/{len(crawled_data)}: {page['url']}")
             analysis = analyzer.analyze_page(page)
+            # 1. Collect texts needing suggestions
+            texts_to_translate = set()
             for issue in analysis['issues']:
-                issue['url'] = page['url'] # Add context
-                
-                # Deduct points (Simplified scoring per issue type)
-                # Apply to ALL target languages for now, as we don't know which one failed specifically 
-                # unless we detected the language.
-                # If we found "English fallback", that applies to ALL target langs that are NOT English.
-                
-                if issue['type'] == 'fallback_text': # 1x
-                    total_fallback += 1
-                elif issue['type'] == 'mixed_language': # 3x
-                    total_mixed += 1
-                elif issue['type'] == 'broken_placeholder': # 5x
-                    total_broken += 1
-                
-                # Check for Missing Translation (using Lingo)
-                # If it's a fallback, it IS a missing translation candidate
-                # VERIFICATION: Suspected Mixed Content
-                if issue['type'] == 'suspected_mixed':
-                     # Verify with Lingo
-                     # Strategy: Translate text to target language (e.g., 'ta').
-                     # - If result == text (identity): It implies text IS ALREADY target language. (FALSE POSITIVE by langdetect)
-                     # - If result != text: It implies text WAS English (or other) and needed translation. (TRUE POSITIVE)
-                     
-                     # We only verify against the FIRST non-base language for now (assuming single target mode mostly)
-                     # or check against the page's detected language?
-                     # Analyzer returned 'detected_language' in 'analysis', but we are iterating 'issues'.
-                     # Let's assume we target the first requested language for verification if we don't have page lang here.
-                     # Actually, Analyzer logic used 'current_page_lang'. We assume 'languages' input contains it.
-                     
-                     target_verification_lang = languages[0] if languages[0] != base_language else (languages[1] if len(languages)>1 else 'es')
-                     
-                     verification = await lingo_client.suggest_translation(issue['text'], target_verification_lang)
-                     
-                     # Normalize for comparison (ignore case, small spacing)
-                     if verification and verification.strip().lower() != issue['text'].strip().lower():
-                         # CONFIRMED ISSUE
-                         issue['type'] = 'mixed_language'
-                         issue['details'] = f"Verified by Lingo: '{issue['text']}' -> '{verification}'"
-                         # We can also pre-fill the suggestion!
-                         issue[f'suggestion_{target_verification_lang}'] = verification
-                     else:
-                         # FALSE ALARM (Text matches target language)
-                         continue # Skip adding this issue
-                
                 if issue['type'] in ['fallback_text', 'mixed_language']:
-                     # For each target language, suggest a fix
+                    texts_to_translate.add(issue['text'])
+            
+            # 2. Batch Translate (for each target language)
+            # We assume non-base languages are targets
+            translations_map = {} # { lang: { text: translation } }
+             
+            if texts_to_translate and not is_mock:
+                 Actor.log.info(f"  > Batch translating {len(texts_to_translate)} unique items...")
+                 
+                 for lang in languages:
+                    if lang == base_language: continue
+                    # Call batch method
+                    translations_map[lang] = await lingo_client.suggest_translation_batch(list(texts_to_translate), lang)
+
+            # 3. Apply results to issues
+            for j, issue in enumerate(analysis['issues']):
+                issue['url'] = page['url']
+                
+                # Apply suggestions if available
+                if issue['type'] in ['fallback_text', 'mixed_language']:
                      for lang in languages:
                         if lang == base_language: continue
                         
-                        suggestion = await lingo_client.suggest_translation(
-                            issue['text'], 
-                            target_lang=lang, 
-                            context=issue.get('context')
-                        )
-                        issue[f'suggestion_{lang}'] = suggestion
-                        total_missing += 1 # Count this as a missing translation need
+                        # Get from batch result or fallback to None
+                        # If MOCK, we didn't populate the map properly above in this snippet logic
+                        # But lingo_client handles mock in batch too.
+                        
+                        translation = None
+                        if is_mock:
+                             translation = f"[MOCK] {issue['text']}"
+                        elif lang in translations_map and issue['text'] in translations_map[lang]:
+                             translation = translations_map[lang][issue['text']]
+                        
+                        if translation:
+                            issue[f'suggestion_{lang}'] = translation
                 
                 all_issues.append(issue)
+                
+                if issue['type'] == 'fallback_text': total_fallback += 1
+                elif issue['type'] == 'mixed_language': total_mixed += 1
+                elif issue['type'] == 'broken_placeholder': total_broken += 1
+                if issue.get(f'suggestion_{languages[0] if languages[0]!=base_language else "es"}'):
+                    total_missing += 1
 
         # 3. Calculate Final Scores
         # Score = 100 - 2*missing - 1*fallback - 3*mixed - 5*broken
@@ -182,9 +171,104 @@ async def main():
                     row[f'suggestion_{lang}'] = i.get(f'suggestion_{lang}', '')
                 csv_data.append(row)
                 
+            # Create HTML Report
+            html_report = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Localization Health Report</title>
+                <style>
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max_width: 800px; margin: 0 auto; padding: 20px; color: #333; }}
+                    h1 {{ border-bottom: 2px solid #eaeaea; padding-bottom: 10px; }}
+                    .score-card {{ background: #f7f7f7; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }}
+                    .score {{ font-size: 48px; font-weight: bold; color: {'#d32f2f' if final_scores[0]['score'] < 50 else '#388e3c'}; }}
+                    .section {{ margin-top: 30px; }}
+                    table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+                    th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
+                    th {{ background-color: #f8f9fa; }}
+                    .tag {{ padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }}
+                    .tag.fallback {{ background: #fff3cd; color: #856404; }}
+                    .tag.mixed {{ background: #f8d7da; color: #721c24; }}
+                </style>
+            </head>
+            <body>
+                <h1>Localization Health Report</h1>
+                
+                <div class="score-card">
+                    <div>Overall Score ({languages[0] if languages[0]!=base_language else (languages[1] if len(languages)>1 else 'es')})</div>
+                    <div class="score">{final_scores[0]['score']} / 100</div>
+                    <div>
+                        Missing: {final_scores[0]['issues']['missing']} | 
+                        Fallbacks: {final_scores[0]['issues']['fallbacks']} | 
+                        Mixed: {final_scores[0]['issues']['mixedLanguage']}
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>Found Issues ({len(all_issues)})</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Found Text</th>
+                                <th>Suggestion</th>
+                                <th>Context</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            """
+            
+            # Add top 100 issues to HTML
+            for issue in all_issues[:100]:
+                report_suggestion = ""
+                # Find any suggestion key
+                for k,v in issue.items():
+                    if k.startswith('suggestion_'): report_suggestion = v; break
+                
+                tag_class = 'mixed' if issue['type'] == 'mixed_language' else 'fallback'
+                
+                html_report += f"""
+                            <tr>
+                                <td><span class="tag {tag_class}">{issue['type']}</span></td>
+                                <td>{issue['text'][:100]}</td>
+                                <td>{report_suggestion}</td>
+                                <td style="color:#666; font-size:12px">{issue.get('context', '')[:50]}...</td>
+                            </tr>
+                """
+            
+            html_report += """
+                        </tbody>
+                    </table>
+                </div>
+            </body>
+            </html>
+            """
+            
+            await Actor.set_value('OUTPUT.html', html_report, content_type='text/html')
+            Actor.log.info("HTML Report generated: OUTPUT.html")
+
             df = pd.DataFrame(csv_data)
             await Actor.set_value('localization_issues.csv', df.to_csv(index=False), content_type='text/csv')
+            
+            # Log examples of issues for user visibility
+            Actor.log.info("--- ISSUE HIGHLIGHTS ---")
+            
+            fallbacks = [i['text'] for i in all_issues if i['type'] == 'fallback_text'][:5]
+            if fallbacks:
+                Actor.log.info(f"Top 5 Fallback Text examples (English on target page):")
+                for text in fallbacks: Actor.log.info(f"  - \"{text[:50]}...\"")
+
+            mixed = [i['text'] for i in all_issues if i['type'] == 'mixed_language'][:5]
+            if mixed:
+                Actor.log.info(f"Top 5 Mixed Language examples (confirmed by Lingo):")
+                for text in mixed: Actor.log.info(f"  - \"{text[:50]}...\"")
+
         
+        # Charge for the event (Pay-per-event)
+        # The event name 'localization-check' must be configured in Apify Console
+        await Actor.charge('localization-check')
+        Actor.log.info("Charged for event: localization-check")
+
         Actor.log.info("Analysis Complete.")
         Actor.log.info(f"Scores: {final_scores}")
 
