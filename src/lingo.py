@@ -16,15 +16,15 @@ class LingoClient:
             return f"[MOCK TRANSLATION to {target_lang}] {text}"
             
         try:
-            async with LingoDotDevEngine(self.api_key) as lingo:
+            async with LingoDotDevEngine({"api_key": self.api_key}) as lingo:
                 # Assuming simple translate_text or similar method exists in SDK
                 # Adjusted to likely method name or standard usage. 
                 # If 'translate_text' doesn't exist, we might fail again.
                 # Let's hope the SDK follows the search result description even if class name differed.
-                 result = await lingo.translate_text(
+                 result = await lingo.quick_translate(
                     text, 
-                    target_language_code=target_lang,
-                    context=context
+                    api_key=self.api_key,
+                    target_locale=target_lang
                 )
                  return result
         except Exception as e:
@@ -49,7 +49,7 @@ class LingoClient:
              async with LingoDotDevEngine(self.api_key) as lingo:
                  # hypothetical batch method
                  for text in text_list:
-                     trans = await lingo.translate_text(text, target_language_code=target_lang)
+                     trans = await lingo.quick_translate(text, api_key=self.api_key, target_locale=target_lang)
                      results[text] = trans
         except Exception as e:
             Actor.log.error(f"Lingo.dev Audit error: {e}")

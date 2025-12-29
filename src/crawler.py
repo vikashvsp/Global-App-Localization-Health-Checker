@@ -27,19 +27,26 @@ class Crawler:
                 Actor.log.info(f"Crawling: {url}")
                 
                 try:
+                    Actor.log.info(f"DEBUG: Opening new page")
                     page = await context.new_page()
+                    Actor.log.info(f"DEBUG: Going to {url}")
                     await page.goto(url, wait_until="networkidle", timeout=30000)
                     
                     # Extract content
+                    Actor.log.info(f"DEBUG: Getting content")
                     content = await page.content()
+                    Actor.log.info(f"DEBUG: Parsing soup")
                     soup = BeautifulSoup(content, 'html.parser')
                     
                     # Extract visible text nodes, buttons, headings
+                    Actor.log.info(f"DEBUG: Extracting text")
                     page_data = self._extract_text(soup, url)
+                    Actor.log.info(f"DEBUG: Text extracted, items: {len(page_data['items'])}")
                     self.crawled_data.append(page_data)
                     
                     # Find links for next crawl
                     if len(self.visited_urls) < self.max_pages:
+                        Actor.log.info(f"DEBUG: Getting links")
                         links = self._get_links(soup, url)
                         for link in links:
                             if link not in self.visited_urls and link not in queue:
@@ -48,6 +55,8 @@ class Crawler:
                     await page.close()
                     
                 except Exception as e:
+                    import traceback
+                    traceback.print_exc()
                     Actor.log.error(f"Failed to crawl {url}: {e}")
             
             await browser.close()
@@ -83,16 +92,31 @@ class Crawler:
                 extracted.append({'type': 'heading', 'text': text, 'key': key, 'context': str(h)[:100]})
 
         # 3. Label-like text
-        for tag in soup.find_all(['label', 'span', 'p', 'div']):
+        # 3. Text Blobs (Robust find_all approach)
+        # We capture text from common container tags. 
+        # Duplicates are handled by the dedup logic below.
+        for tag in soup.find_all(['label', 'span', 'p', 'div', 'li', 'td', 'th']):
             text = tag.get_text(strip=True)
-            if text and len(text) < 100:
-               key = get_key(tag, text)
-               if tag.name == 'label' or 'label' in tag.get('class', []):
-                    extracted.append({'type': 'label', 'text': text, 'key': key, 'context': str(tag)[:100]})
-               elif 'error' in str(tag.get('class', [])) or 'alert' in str(tag.get('class', [])):
-                    extracted.append({'type': 'error_message', 'text': text, 'key': key, 'context': str(tag)[:100]})
-               elif not tag.find_children():
-                    extracted.append({'type': 'text', 'text': text, 'key': key, 'context': str(tag)[:100]})
+            # Skip if empty or too long (likely code/params)
+            if not text or len(text) > 1000:
+                continue
+            
+            # Skip script/style parent content
+            if tag.parent.name in ['script', 'style', 'head', 'noscript']:
+                continue
+
+            # Heuristic: If it has many children tags, it's likely a container, not a leaf text node.
+            # But we want to catch "Mixed content". 
+            # Let's try to capture it if it has text.
+            
+            key = get_key(tag, text)
+            
+            # Simple typing based on tag
+            t_type = 'text'
+            if tag.name == 'label': t_type = 'label'
+            elif 'error' in str(tag.get('class', '')): t_type = 'error_message'
+            
+            extracted.append({'type': t_type, 'text': text, 'key': key, 'context': str(tag)[:100]})
 
         # Dedup extracted items based on text+type
         unique_extracted = []
