@@ -30,7 +30,7 @@ class Crawler:
                     Actor.log.info(f"DEBUG: Opening new page")
                     page = await context.new_page()
                     Actor.log.info(f"DEBUG: Going to {url}")
-                    await page.goto(url, wait_until="networkidle", timeout=30000)
+                    await page.goto(url, wait_until="domcontentloaded", timeout=60000)
                     
                     # Extract content
                     Actor.log.info(f"DEBUG: Getting content")
