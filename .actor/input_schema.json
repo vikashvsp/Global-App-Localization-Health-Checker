@@ -11,6 +11,7 @@
                 "website",
                 "json"
             ],
+            "editor": "select",
             "default": "website"
         },
         "url": {
@@ -36,12 +37,14 @@
             "title": "Base Language",
             "type": "string",
             "description": "The primary language of the source (usually 'en')",
+            "editor": "textfield",
             "default": "en"
         },
         "maxPages": {
             "title": "Max Pages",
             "type": "integer",
             "description": "Maximum number of pages to crawl",
+            "editor": "number",
             "default": 5
         },
         "lingoApiKey": {

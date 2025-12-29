@@ -1,5 +1,6 @@
 {
     "actorSpecification": 1,
+    "actorOutputSchemaVersion": 1,
     "title": "Global App Localization Health Checker Output",
     "properties": {
         "detailedReport": {
