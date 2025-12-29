@@ -3,7 +3,7 @@
     "name": "global-app-localization-health-checker",
     "version": "0.1",
     "buildTag": "latest",
-    "dockerfile": "./Dockerfile",
+    "dockerfile": "../Dockerfile",
     "readme": "./README.md",
     "input": "./input_schema.json",
     "output": "./output_schema.json",
