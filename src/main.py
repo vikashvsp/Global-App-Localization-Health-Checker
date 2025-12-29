@@ -64,6 +64,34 @@ async def main():
                 
                 # Check for Missing Translation (using Lingo)
                 # If it's a fallback, it IS a missing translation candidate
+                # VERIFICATION: Suspected Mixed Content
+                if issue['type'] == 'suspected_mixed':
+                     # Verify with Lingo
+                     # Strategy: Translate text to target language (e.g., 'ta').
+                     # - If result == text (identity): It implies text IS ALREADY target language. (FALSE POSITIVE by langdetect)
+                     # - If result != text: It implies text WAS English (or other) and needed translation. (TRUE POSITIVE)
+                     
+                     # We only verify against the FIRST non-base language for now (assuming single target mode mostly)
+                     # or check against the page's detected language?
+                     # Analyzer returned 'detected_language' in 'analysis', but we are iterating 'issues'.
+                     # Let's assume we target the first requested language for verification if we don't have page lang here.
+                     # Actually, Analyzer logic used 'current_page_lang'. We assume 'languages' input contains it.
+                     
+                     target_verification_lang = languages[0] if languages[0] != base_language else (languages[1] if len(languages)>1 else 'es')
+                     
+                     verification = await lingo_client.suggest_translation(issue['text'], target_verification_lang)
+                     
+                     # Normalize for comparison (ignore case, small spacing)
+                     if verification and verification.strip().lower() != issue['text'].strip().lower():
+                         # CONFIRMED ISSUE
+                         issue['type'] = 'mixed_language'
+                         issue['details'] = f"Verified by Lingo: '{issue['text']}' -> '{verification}'"
+                         # We can also pre-fill the suggestion!
+                         issue[f'suggestion_{target_verification_lang}'] = verification
+                     else:
+                         # FALSE ALARM (Text matches target language)
+                         continue # Skip adding this issue
+                
                 if issue['type'] in ['fallback_text', 'mixed_language']:
                      # For each target language, suggest a fix
                      for lang in languages:

@@ -78,7 +78,7 @@ class Crawler:
             return slug.strip('_')
 
         # 1. Buttons
-        for btn in soup.find_all(['button', 'a'], class_=True):
+        for btn in soup.find_all(['button', 'a']):
             text = btn.get_text(strip=True)
             if text:
                 key = get_key(btn, text)

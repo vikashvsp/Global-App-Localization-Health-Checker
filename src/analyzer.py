@@ -18,20 +18,6 @@ class Analyzer:
         """Analyzes a single page's data for localization issues."""
         issues = []
         
-        # Determine expected language for the page (heuristic for now: assume base URL structure or default to base_lang)
-        # Real impl might look at /es/ in URL, but for MVP we might just check if text matches ANY target lang
-        # actually, the requirement is "English fallback in non-English page".
-        # But if we are scanning "example.com", we assumed it's the base language version?
-        # The user input has "languages": ["en", "hi", "es"].
-        # If we crawl, we might hit example.com/es. 
-        # For MVP, let's assume the crawler finds pages, and we try to guess the INTENDED language of that page
-        # OR we just check against ALL target languages.
-        
-        # Let's simplify: We check each text string.
-        # If it looks like English, but we are supposed to be in 'hi' mode? 
-        # Since we don't know which page maps to which language yet without URL analysis...
-        # Let's try to detect the DOMINANT language of the page first.
-        
         page_text_blob = " ".join([item['text'] for item in page_data['items']])
         detected_page_lang = self.detect_language(page_text_blob[:1000]) # Detect from first 1000 chars
         
@@ -53,15 +39,15 @@ class Analyzer:
                     'context': item['context']
                 })
 
-            # 2. Mixed Language (if item lang differs from page lang, and both are confident)
-            # Only flag if text is long enough to be confident
-            if len(text) > 20 and item_lang and item_lang != current_page_lang:
-                 # Special case: English fallback
+            # 2. Mixed Language / Fallback Detection
+            
+            # A. Confident Mismatch (Long text, lang detected, mismatch)
+            if len(text) > 15 and item_lang and item_lang != current_page_lang:
                  if item_lang == 'en' and current_page_lang != 'en':
                      issues.append({
                         'type': 'fallback_text',
                         'text': text,
-                        'key': key, # Pass key
+                        'key': key,
                         'severity': 'medium',
                         'context': item['context']
                      })
@@ -69,11 +55,29 @@ class Analyzer:
                      issues.append({
                         'type': 'mixed_language',
                         'text': text,
-                        'key': key, # Pass key
+                        'key': key,
                         'severity': 'medium',
                         'context': item['context'],
                         'details': f'Detected {item_lang} on {current_page_lang} page'
                      })
+            
+            # B. Suspected Mixed (Short text, UI elements, flaky detection)
+            # If text is short (< 15) AND we are on a non-English page
+            # We suspect it might be English if it's not explicitly matching current lang
+            elif len(text) <= 15 and len(text) > 3 and current_page_lang != 'en':
+                # We flag this for verification.
+                # Optimization: If langdetect says it matches page lang, we trust it?
+                # langdetect is flaky on short text. "Login" -> "it". 
+                # So we should verify EVERYTHING short unless we are very sure.
+                # Let's verify anything short (>3 chars) on non-English pages.
+                
+                 issues.append({
+                    'type': 'suspected_mixed',
+                    'text': text,
+                    'key': key,
+                    'severity': 'low',
+                    'context': item['context']
+                 })
 
             # 3. Missing Translation (Heuristic: same as fallback really, or if we had a reference)
             # For MVP without a reference JSON, "Missing Translation" is hard to distinguish from "Fallback".
