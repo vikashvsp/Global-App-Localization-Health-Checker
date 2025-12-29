@@ -1,0 +1,7 @@
+apify
+beautifulsoup4
+requests
+langdetect
+playwright
+pandas
+lingodotdev

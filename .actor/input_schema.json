@@ -1,0 +1,61 @@
+{
+    "title": "Global App Localization Health Checker Input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "sourceType": {
+            "title": "Source Type",
+            "type": "string",
+            "description": "Source of content to check (website or i18n JSON)",
+            "enum": [
+                "website",
+                "json"
+            ],
+            "default": "website"
+        },
+        "url": {
+            "title": "URL",
+            "type": "string",
+            "description": "The URL of the website to crawl or the JSON file URL",
+            "editor": "textfield",
+            "prefill": "https://example.com"
+        },
+        "languages": {
+            "title": "Target Languages",
+            "type": "array",
+            "description": "List of language codes to check against",
+            "editor": "stringList",
+            "prefill": [
+                "en",
+                "hi",
+                "es",
+                "fr"
+            ]
+        },
+        "baseLanguage": {
+            "title": "Base Language",
+            "type": "string",
+            "description": "The primary language of the source (usually 'en')",
+            "default": "en"
+        },
+        "maxPages": {
+            "title": "Max Pages",
+            "type": "integer",
+            "description": "Maximum number of pages to crawl",
+            "default": 5
+        },
+        "lingoApiKey": {
+            "title": "Lingo.dev API Key",
+            "type": "string",
+            "description": "Your Lingo.dev API key for suggestions and scoring",
+            "editor": "textfield",
+            "isSecret": true
+        }
+    },
+    "required": [
+        "sourceType",
+        "url",
+        "languages",
+        "baseLanguage"
+    ]
+}

@@ -1,0 +1,18 @@
+{
+    "actorOutputSchemaVersion": 1,
+    "title": "Global App Localization Health Checker Output",
+    "properties": {
+        "detailedReport": {
+            "title": "Detailed Analysis Report",
+            "type": "string",
+            "description": "Full JSON list of all detected issues",
+            "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/DETAILED_REPORT"
+        },
+        "csvReport": {
+            "title": "CSV Report",
+            "type": "string",
+            "description": "Downloadable CSV spreadsheet of issues",
+            "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/localization_issues.csv"
+        }
+    }
+}

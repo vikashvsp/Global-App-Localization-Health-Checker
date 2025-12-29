@@ -1,0 +1,33 @@
+{
+    "actorDatasetSchemaVersion": 1,
+    "title": "Localization Scores",
+    "description": "Scoring results for each language analyzed",
+    "fields": {
+        "language": {
+            "type": "string",
+            "description": "The target language code"
+        },
+        "score": {
+            "type": "integer",
+            "description": "Localization health score (0-100)"
+        },
+        "issues": {
+            "type": "object",
+            "description": "Counts of issues found",
+            "properties": {
+                "missing": {
+                    "type": "integer"
+                },
+                "fallbacks": {
+                    "type": "integer"
+                },
+                "mixedLanguage": {
+                    "type": "integer"
+                },
+                "brokenPlaceholders": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}
