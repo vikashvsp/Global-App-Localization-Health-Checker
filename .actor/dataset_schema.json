@@ -1,6 +1,5 @@
 {
     "actorSpecification": 1,
-    "actorDatasetSchemaVersion": 1,
     "title": "Localization Scores",
     "description": "Scoring results for each language analyzed",
     "fields": {
