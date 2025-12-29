@@ -69,27 +69,4 @@ class LingoClient:
         
         return results
 
-    async def suggest_translation(self, text, target_lang, context=None):
-        """
-        Checks for terminology consistency.
-        For MVP, we might just batch translate and look for variations, 
-        or if Lingo has a specific 'audit' or 'consistency' check.
-        Search results mentioned 'glossaries'.
-        For now, let's just use it to generate 'ideal' translations for comparison.
-        """
-        if self.mock:
-            Actor.log.info(f"[MOCK] Auditing terminology for {len(text_list)} items")
-            return {t: f"[Certified] {t}" for t in text_list}
 
-        results = {}
-        # Batch processing if SDK supports it, or loop
-        try:
-             async with LingoDotDevEngine(self.api_key) as lingo:
-                 # hypothetical batch method
-                 for text in text_list:
-                     trans = await lingo.quick_translate(text, api_key=self.api_key, target_locale=target_lang)
-                     results[text] = trans
-        except Exception as e:
-            Actor.log.error(f"Lingo.dev Audit error: {e}")
-        
-        return results
